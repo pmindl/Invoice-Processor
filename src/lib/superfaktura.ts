@@ -157,7 +157,7 @@ export async function createExpense(
         const payload = {
             Expense: {
                 name: invoice.supplier.name,
-                variable: invoice.invoice.variable_symbol,
+                variable: invoice.invoice.variable_symbol || invoice.invoice.number,
                 amount: invoice.totals.total,
                 currency: normalizeCurrency(invoice.invoice.currency),
                 date: formatDate(invoice.invoice.date_issued),

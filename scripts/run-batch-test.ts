@@ -165,27 +165,28 @@ async function main() {
                 }
 
                 // Duplicate Check
-                if (!parsed.invoice.variable_symbol) {
+                const variableSymbol = parsed.invoice.variable_symbol || parsed.invoice.number;
+                if (!variableSymbol) {
                     logs.push({
                         fileName: file.name,
                         status: 'Error',
-                        detail: 'Missing Variable Symbol',
+                        detail: 'Missing Variable Symbol and Invoice Number',
                         invoiceNumber: parsed.invoice.number
                     });
-                    await logEvent(prisma, 'WARN', 'BatchProcessor', `Missing Variable Symbol for ${file.name}`, null, invoiceId);
+                    await logEvent(prisma, 'WARN', 'BatchProcessor', `Missing Variable Symbol and Invoice Number for ${file.name}`, null, invoiceId);
                     continue;
                 }
 
-                const isDuplicate = await checkDuplicate(parsed.invoice.variable_symbol);
+                const isDuplicate = await checkDuplicate(variableSymbol);
                 if (isDuplicate) {
                     logs.push({
                         fileName: file.name,
                         status: 'Duplicate',
                         detail: 'Exists in SuperFaktura',
                         invoiceNumber: parsed.invoice.number,
-                        vs: parsed.invoice.variable_symbol
+                        vs: variableSymbol
                     });
-                    await logEvent(prisma, 'WARN', 'SuperFaktura', `Duplicate detected: ${parsed.invoice.variable_symbol}`, null, invoiceId);
+                    await logEvent(prisma, 'WARN', 'SuperFaktura', `Duplicate detected: ${variableSymbol}`, null, invoiceId);
 
                     // Mark as DUPLICATE in DB if not already
                     if (invoiceId) {
@@ -212,7 +213,7 @@ async function main() {
                         status: 'Error',
                         detail: `SF Error: ${sfResult.error}`,
                         invoiceNumber: parsed.invoice.number,
-                        vs: parsed.invoice.variable_symbol
+                        vs: variableSymbol
                     });
                     await logEvent(prisma, 'ERROR', 'SuperFaktura', `Export failed: ${sfResult.error}`, null, invoiceId);
                     if (invoiceId) await prisma.invoice.update({ where: { id: invoiceId }, data: { status: 'EXPORT_ERROR', errorMessage: sfResult.error } });
@@ -223,7 +224,7 @@ async function main() {
                         detail: 'Successfully Exported',
                         sfId: sfResult.id,
                         invoiceNumber: parsed.invoice.number,
-                        vs: parsed.invoice.variable_symbol
+                        vs: variableSymbol
                     });
                     await logEvent(prisma, 'INFO', 'SuperFaktura', `Successfully exported. SF ID: ${sfResult.id}`, null, invoiceId);
                     if (invoiceId) await prisma.invoice.update({ where: { id: invoiceId }, data: { status: 'EXPORTED', externalId: sfResult.id } });
