@@ -57,7 +57,8 @@ export const InvoiceService = {
                         await logEvent(db, 'WARN', 'API', `Skipped ${file.name}: Low confidence`, { confidence: parsed.confidence });
                     }
 
-                    // 6. External Duplicate Check
+                    // 6. Internal Duplicate Check (Local DB)
+                    // We check external SF duplicates only during export to save API calls
                     if (status === 'PENDING' && parsed.invoice.variable_symbol) {
                         const dbDup = await db.invoice.findFirst({
                             where: {

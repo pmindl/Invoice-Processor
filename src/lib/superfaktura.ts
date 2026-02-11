@@ -1,10 +1,6 @@
 import { ParsedInvoice, CompanyConfig } from './types';
-
-interface SFResponse {
-    error: number;
-    message: string;
-    data?: any;
-}
+import { z } from 'zod';
+import { SFClientSchema, SFDuplicateResponseSchema, SFExpenseResponseSchema } from './schemas';
 
 interface SFClient {
     id: string;
@@ -49,17 +45,34 @@ export async function getClientByIco(ico: string): Promise<SFClient | null> {
             clients = data;
         } else if (data && data.error === 0 && Array.isArray(data.data)) {
             clients = data.data;
+        } else if (data && Array.isArray(data.items)) {
+             clients = data.items;
         }
+
+        // Validate items with Zod implicitly by checking fields
+        // Since we already have a runtime object, let's map it
 
         if (clients.length > 0) {
             // Find exact match
-            const match = clients.find((c: any) => c.Client.ico === ico);
+            const match = clients.find((c: any) => {
+                const client = c.Client || c;
+                // Optional Zod check per item if strictness needed
+                // const parsed = SFClientSchema.safeParse(client);
+                // if (!parsed.success) return false;
+                return client.ico === ico;
+            });
+
             if (match) {
-                return {
-                    id: match.Client.id,
-                    name: match.Client.name,
-                    ico: match.Client.ico
-                };
+                 const client = match.Client || match;
+                 // Parse with Zod to be sure
+                 const validClient = SFClientSchema.safeParse(client);
+                 if (validClient.success) {
+                    return {
+                        id: validClient.data.id,
+                        name: validClient.data.name,
+                        ico: validClient.data.ico
+                    };
+                 }
             }
         }
         return null;
@@ -87,13 +100,11 @@ export async function createClient(supplier: { name: string; ico?: string; dic?:
         body: `data=${JSON.stringify(payload)}`
     });
 
-    if (res.error === 0 && res.data?.Client?.id) {
-        return res.data.Client.id;
-    }
-
-    // Sometimes returns just ID/integer
-    if (res.error === 0 && typeof res.data === 'number') {
-        return String(res.data);
+    // Zod Validation not strictly applicable here as response varies wildly
+    // But we check structure
+    if (res.error === 0) {
+         if (res.data?.Client?.id) return String(res.data.Client.id);
+         if (typeof res.data === 'number') return String(res.data);
     }
 
     throw new Error(res.message || 'Failed to create client');
@@ -191,16 +202,34 @@ export async function createExpense(
             body: `data=${JSON.stringify(payload)}`
         });
 
-        if (res.error === 0) {
-            // Handle different ID locations in response
-            const newId = res.data?.Expense?.id || res.data?.expense_id || res.data;
-            return { id: String(newId) };
-        } else {
-            const errorMsg = typeof res.error_message === 'object'
-                ? JSON.stringify(res.error_message)
-                : (res.error_message || res.message);
-            return { id: '', error: errorMsg };
+        // Validate with Zod
+        const parsed = SFExpenseResponseSchema.safeParse(res);
+
+        if (!parsed.success) {
+            console.error("SF Validation Error:", parsed.error);
+             return { id: '', error: `Invalid API Response: ${parsed.error.message}` };
         }
+
+        const data = parsed.data;
+
+        if (data.error === 0 || !data.error) {
+             // Handle different ID locations
+             if (typeof data.data === 'object' && data.data !== null) {
+                  const expenseData = data.data as any; // TS limitation with union types access
+                  const newId = expenseData?.Expense?.id || expenseData?.expense_id;
+                  if (newId) return { id: String(newId) };
+             }
+             if (typeof data.data === 'number' || typeof data.data === 'string') {
+                 return { id: String(data.data) };
+             }
+        }
+
+        // Error case
+        const errorMsg = typeof data.error_message === 'object'
+            ? JSON.stringify(data.error_message)
+            : (data.error_message || data.message || 'Unknown SF Error');
+
+        return { id: '', error: errorMsg };
 
     } catch (error) {
         return { id: '', error: (error as Error).message };
@@ -211,7 +240,7 @@ function encodeSFSearch(term: string): string {
     return Buffer.from(term).toString('base64')
         .replace(/\+/g, '-')
         .replace(/\//g, '_')
-        .replace(/=/g, ',');
+        .replace(/\=/g, ',');
 }
 
 export async function checkDuplicate(variableSymbol: string): Promise<boolean> {
@@ -235,12 +264,24 @@ export async function checkDuplicate(variableSymbol: string): Promise<boolean> {
 
         let items: any[] = [];
 
-        if (Array.isArray(data)) {
-            items = data;
-        } else if (data && Array.isArray(data.items)) {
-            items = data.items;
-        } else if (data && data.error === 0 && Array.isArray(data.data)) {
-            items = data.data; // Fallback for standard structure
+        // Zod Parse Attempt
+        const parsed = SFDuplicateResponseSchema.safeParse(data);
+
+        if (parsed.success) {
+             if (Array.isArray(parsed.data)) {
+                 items = parsed.data;
+             } else if ('items' in parsed.data) {
+                 items = parsed.data.items;
+             } else if ('data' in parsed.data && Array.isArray(parsed.data.data)) {
+                 items = parsed.data.data;
+             }
+        } else {
+             console.warn("SF Duplicate Response Schema Mismatch:", parsed.error);
+             // Fallback to manual extraction if schema fails (e.g. unknown new format), but log warning
+             // Or fail strictly? Let's fallback for now to be safe
+             if (Array.isArray(data)) items = data;
+             else if (data.items) items = data.items;
+             else if (data.data) items = data.data;
         }
 
         // Double check results locally to be 100% sure

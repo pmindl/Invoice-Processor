@@ -8,7 +8,9 @@ export const config = {
         apiKey: process.env.APP_API_KEY || '',
     },
     google: {
-        driveFolderId: process.env.GOOGLE_DRIVE_FOLDER_ID || '', // Replace hardcoded ID '1T7Ew6PoJn8EcFb-9kiR2NaVAp_SRMU6R'
+        // Fallback folder ID for simple test scripts
+        // But in production, folders are per-company from process.env.COMPANIES
+        defaultDriveFolderId: process.env.GOOGLE_DRIVE_FOLDER_ID || '',
     },
     superfaktura: {
         baseUrl: process.env.SF_BASE_URL || 'https://moje.superfaktura.cz',
@@ -17,6 +19,8 @@ export const config = {
         companyId: process.env.SF_COMPANY_ID || '',
     },
     companies: {
+        // Pre-defined known company metadata for Gemini prompt
+        // These are distinct from the dynamic list of folders to process
         firmaA: {
             name: 'Lumegro s.r.o.',
             ico: '08827877',
