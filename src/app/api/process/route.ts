@@ -59,7 +59,8 @@ export async function processCompany(company: CompanyConfig) {
                 }
 
                 // 6. External Duplicate Check
-                if (status === 'PENDING' && parsed.invoice.variable_symbol) {
+                const variableSymbol = parsed.invoice.variable_symbol || parsed.invoice.number;
+                if (status === 'PENDING' && variableSymbol) {
                     // Check against DB first to be sure
                     const dbDup = await db.invoice.findFirst({
                         where: {
@@ -70,7 +71,7 @@ export async function processCompany(company: CompanyConfig) {
                     if (dbDup) {
                         status = 'DUPLICATE';
                         errorMessage = 'Duplicate in local DB';
-                        await logEvent(db, 'WARN', 'API', `Duplicate in DB: ${parsed.invoice.variable_symbol}`, null);
+                        await logEvent(db, 'WARN', 'API', `Duplicate in DB: ${variableSymbol}`, null);
                     }
                 }
 

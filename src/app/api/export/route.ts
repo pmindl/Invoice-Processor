@@ -32,8 +32,9 @@ export async function POST(request: Request) {
             }
 
             // Check external duplicate (SuperFaktura)
-            if (invoice.variableSymbol) {
-                const isDup = await checkDuplicate(invoice.variableSymbol);
+            const variableSymbol = invoice.variableSymbol || invoice.invoiceNumber;
+            if (variableSymbol) {
+                const isDup = await checkDuplicate(variableSymbol);
                 if (isDup) {
                     await db.invoice.update({
                         where: { id: invoice.id },
