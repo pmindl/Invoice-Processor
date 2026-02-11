@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "vitest"
+    "test": "vitest",
+    "test:packeta": "tsx scripts/test-packeta.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

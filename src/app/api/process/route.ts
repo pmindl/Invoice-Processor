@@ -3,7 +3,8 @@ import { db } from '@/lib/db';
 import { getCompanies } from '@/lib/companies';
 import { listFiles, downloadFile } from '@/lib/gdrive';
 import { parseInvoice } from '@/lib/gemini';
-import { CompanyConfig } from '@/lib/types';
+import { parsePacketaInvoice } from '@/lib/parsers/packeta';
+import { CompanyConfig, ParsedInvoice } from '@/lib/types';
 import { logEvent } from '@/lib/logger';
 
 export const maxDuration = 60; // Allow 60s for processing
@@ -34,15 +35,29 @@ export async function processCompany(company: CompanyConfig) {
                 // 2. Download
                 const { buffer, mimeType } = await downloadFile(file.id);
 
-                // 3. AI Parse
-                // Gemini handles PDF/Images via buffer. Text files need string conversion.
-                let textOrImage: string | Buffer = buffer;
-                if (mimeType.startsWith('text/') || mimeType === 'application/json') {
-                    textOrImage = buffer.toString('utf-8');
+                // 3. Parse Invoice
+                let parsed: ParsedInvoice | null = null;
+                let isPacketa = false;
+
+                // Try Packeta Parser (Deterministic)
+                if (mimeType === 'application/pdf') {
+                    parsed = await parsePacketaInvoice(buffer);
+                    if (parsed) {
+                        isPacketa = true;
+                        await logEvent(db, 'INFO', 'PacketaParser', `Parsed ${file.name} using deterministic Packeta parser`, { confidence: 100 });
+                    }
                 }
 
-                const parsed = await parseInvoice(textOrImage, mimeType);
-                await logEvent(db, 'INFO', 'Gemini', `Parsed ${file.name}`, { confidence: parsed.confidence });
+                // Fallback to Gemini AI
+                if (!parsed) {
+                    // Gemini handles PDF/Images via buffer. Text files need string conversion.
+                    let textOrImage: string | Buffer = buffer;
+                    if (mimeType.startsWith('text/') || mimeType === 'application/json') {
+                        textOrImage = buffer.toString('utf-8');
+                    }
+                    parsed = await parseInvoice(textOrImage, mimeType);
+                    await logEvent(db, 'INFO', 'Gemini', `Parsed ${file.name}`, { confidence: parsed.confidence });
+                }
 
                 // 5. Logic checks
                 let status = 'PENDING';
