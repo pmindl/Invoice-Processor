@@ -4,10 +4,11 @@ import { getCompanies } from '@/lib/companies';
 import { listFiles, downloadFile } from '@/lib/gdrive';
 import { parseInvoice } from '@/lib/gemini';
 import { CompanyConfig } from '@/lib/types';
+import { logEvent } from '@/lib/logger';
 
 export const maxDuration = 60; // Allow 60s for processing
 
-async function processCompany(company: CompanyConfig) {
+export async function processCompany(company: CompanyConfig) {
     const results = { processed: 0, skipped: 0, errors: 0 };
 
     try {
@@ -27,6 +28,7 @@ async function processCompany(company: CompanyConfig) {
             }
 
             console.log(`Processing file: ${file.name} (${file.id})`);
+            await logEvent(db, 'INFO', 'API', `Starting processing for ${file.name}`, { fileId: file.id });
 
             try {
                 // 2. Download
@@ -40,6 +42,7 @@ async function processCompany(company: CompanyConfig) {
                 }
 
                 const parsed = await parseInvoice(textOrImage, mimeType);
+                await logEvent(db, 'INFO', 'Gemini', `Parsed ${file.name}`, { confidence: parsed.confidence });
 
                 // 5. Logic checks
                 let status = 'PENDING';
@@ -48,9 +51,11 @@ async function processCompany(company: CompanyConfig) {
                 if (!parsed.is_invoice) {
                     status = 'SKIPPED';
                     errorMessage = 'Not recognized as invoice';
+                    await logEvent(db, 'WARN', 'API', `Skipped ${file.name}: Not an invoice`, null);
                 } else if (parsed.confidence < 60) {
                     status = 'SKIPPED';
                     errorMessage = `Low confidence: ${parsed.confidence}%`;
+                    await logEvent(db, 'WARN', 'API', `Skipped ${file.name}: Low confidence`, { confidence: parsed.confidence });
                 }
 
                 // 6. External Duplicate Check
@@ -65,11 +70,12 @@ async function processCompany(company: CompanyConfig) {
                     if (dbDup) {
                         status = 'DUPLICATE';
                         errorMessage = 'Duplicate in local DB';
+                        await logEvent(db, 'WARN', 'API', `Duplicate in DB: ${parsed.invoice.variable_symbol}`, null);
                     }
                 }
 
                 // 7. Save to DB
-                await db.invoice.create({
+                const newInvoice = await db.invoice.create({
                     data: {
                         status,
                         company: company.id,
@@ -91,10 +97,16 @@ async function processCompany(company: CompanyConfig) {
                     }
                 });
 
+                if (status === 'PENDING') {
+                    await logEvent(db, 'INFO', 'API', `Invoice created and pending export: ${newInvoice.id}`, null, newInvoice.id);
+                }
+
                 results.processed++;
 
             } catch (err) {
                 console.error(`Error processing file ${file.id}:`, err);
+                await logEvent(db, 'ERROR', 'API', `Error processing ${file.name}`, { error: (err as Error).message });
+
                 // Record error in DB so we don't loop forever
                 await db.invoice.create({
                     data: {

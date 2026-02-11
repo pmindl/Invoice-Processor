@@ -1,7 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ParsedInvoice } from './types';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+
 
 /**
  * Parses an invoice file (text or image/PDF) using Google Gemini AI.
@@ -12,6 +12,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
  * @throws Error if the AI response does not contain valid JSON.
  */
 export async function parseInvoice(textOrImage: string | Buffer, mimeType: string = 'text/plain'): Promise<ParsedInvoice> {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
     const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
     const prompt = `

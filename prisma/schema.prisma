@@ -35,4 +35,20 @@ model Invoice {
   @@unique([supplierIco, invoiceNumber])
   @@index([status])
   @@index([company])
+  logs            ProcessingLog[]
+}
+
+model ProcessingLog {
+  id        String   @id @default(cuid())
+  timestamp DateTime @default(now())
+  level     String   // INFO, WARN, ERROR
+  source    String   // e.g. "API", "Batch", "Gemini"
+  message   String
+  details   String?  // JSON or text
+  invoiceId String?
+  invoice   Invoice? @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+  @@index([level])
+  @@index([timestamp])
 }
