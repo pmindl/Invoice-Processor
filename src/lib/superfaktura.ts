@@ -258,9 +258,7 @@ export async function checkDuplicate(variableSymbol: string): Promise<boolean> {
         return false;
     } catch (e) {
         console.error('SF Duplicate Check Error:', e);
-        // If unsure, better to err on the side of caution? 
-        // Or return false and let user handle unknown errors? 
-        // For now logging is sufficient.
-        return false;
+        // If unsure, throw error so processing stops and we don't create a duplicate
+        throw new Error(`SF Duplicate Check Failed: ${(e as Error).message}`);
     }
 }

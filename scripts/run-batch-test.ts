@@ -5,8 +5,9 @@ import { parseInvoice } from '../src/lib/gemini';
 import { createExpense, checkDuplicate } from '../src/lib/superfaktura';
 import { PrismaClient } from '@prisma/client';
 import { logEvent } from '../src/lib/logger';
+import { config } from '../src/lib/config';
 
-const folderId = '1T7Ew6PoJn8EcFb-9kiR2NaVAp_SRMU6R';
+const folderId = config.google.driveFolderId || '1T7Ew6PoJn8EcFb-9kiR2NaVAp_SRMU6R';
 const prisma = new PrismaClient();
 
 const auth = new google.auth.OAuth2(

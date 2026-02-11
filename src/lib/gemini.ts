@@ -1,7 +1,6 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ParsedInvoice } from './types';
-
-
+import { config } from './config';
 
 /**
  * Parses an invoice file (text or image/PDF) using Google Gemini AI.
@@ -19,8 +18,8 @@ export async function parseInvoice(textOrImage: string | Buffer, mimeType: strin
 System: You are an accounting AI. Analyze this document and extract invoice data.
 
 Known buyer companies:
-- firma_a = Lumegro s.r.o. (ICO: 08827877)
-- firma_b = Lumenica Derm & Med, s.r.o. (ICO: 17904544)
+- firma_a = ${config.companies.firmaA.name} (ICO: ${config.companies.firmaA.ico})
+- firma_b = ${config.companies.firmaB.name} (ICO: ${config.companies.firmaB.ico})
 
 Return ONLY valid JSON matching this schema:
 {
@@ -55,10 +54,19 @@ Return ONLY valid JSON matching this schema:
     const text = response.text();
 
     // Extract JSON from markdown code block if present
+    // Improved regex to capture the outermost JSON object, handling potential markdown wrappers
     const jsonMatch = text.match(/\{[\s\S]*\}/);
+
     if (!jsonMatch) {
+        console.error('Gemini Raw Response:', text);
         throw new Error('No JSON found in AI response');
     }
 
-    return JSON.parse(jsonMatch[0]) as ParsedInvoice;
+    try {
+        return JSON.parse(jsonMatch[0]) as ParsedInvoice;
+    } catch (error) {
+        console.error('JSON Parse Error:', error);
+        console.error('Gemini Raw Response:', text);
+        throw new Error(`Failed to parse JSON from AI response: ${(error as Error).message}`);
+    }
 }
