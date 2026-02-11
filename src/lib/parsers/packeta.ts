@@ -1,5 +1,6 @@
-// @ts-ignore
-const pdf = require('pdf-parse');
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const { PDFParse } = require('pdf-parse');
 import { ParsedInvoice } from '../types';
 
 /**
@@ -7,7 +8,8 @@ import { ParsedInvoice } from '../types';
  */
 async function extractPdfText(buffer: Buffer): Promise<string> {
     try {
-        const data = await pdf(buffer);
+        const parser = new PDFParse({ data: buffer });
+        const data = await parser.getText();
         return data.text;
     } catch (error) {
         console.error('Error extracting text from PDF:', error);
