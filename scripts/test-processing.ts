@@ -1,4 +1,3 @@
-import { processInvoice } from '../src/app/api/process/route';
 import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
@@ -47,7 +46,7 @@ async function main() {
     console.log('--- Step 1: Parsing with Gemini ---');
     const parsed = await parseInvoice(absolutePath);
     console.log('Parsed data:', {
-        invoiceNumber: parsed.invoice.invoice_number,
+        invoiceNumber: parsed.invoice.number,
         vs: parsed.invoice.variable_symbol,
         total: parsed.totals.total,
         currency: parsed.invoice.currency,
@@ -63,13 +62,14 @@ async function main() {
             company: 'lumenica', // Default for test
             supplierName: parsed.supplier.name,
             supplierIco: parsed.supplier.ico,
-            invoiceNumber: parsed.invoice.invoice_number,
+            invoiceNumber: parsed.invoice.number,
             variableSymbol: parsed.invoice.variable_symbol,
-            dateIssued: parsed.invoice.date_issued ? new Date(parsed.invoice.date_issued) : null,
-            dateDue: parsed.invoice.date_due ? new Date(parsed.invoice.date_due) : null,
+            dateIssued: parsed.invoice.date_issued ? new Date(parsed.invoice.date_issued).toISOString() : null,
+            dateDue: parsed.invoice.date_due ? new Date(parsed.invoice.date_due).toISOString() : null,
             total: parsed.totals.total,
             currency: parsed.invoice.currency,
             sourceType: 'manual_test',
+            sourceFileId: 'manual-test-id',
             sourceFileName: path.basename(absolutePath),
             rawJson: JSON.stringify(parsed),
             confidence: 1.0
@@ -89,7 +89,12 @@ async function main() {
             name: 'Lumenica s.r.o.',
             sf_api_email: process.env.SF_API_EMAIL!,
             sf_api_key: process.env.SF_API_KEY!,
-            sf_company_id: process.env.SF_COMPANY_ID!
+            sf_company_id: process.env.SF_COMPANY_ID!,
+            id: 'mock-id',
+            ico: 'mock-ico',
+            gdriveFolderId: 'mock-folder',
+            sfClientId: 'mock-client',
+            emailPatterns: []
         };
 
         const sfResult = await createExpense(parsed, companyConfig, path.basename(absolutePath));
