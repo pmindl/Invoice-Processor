@@ -1,12 +1,20 @@
 import { NextResponse } from 'next/server';
 import { uploadFile } from '@/lib/gdrive';
 import { getCompanyById, getCompanies } from '@/lib/companies';
+import { secureCompare } from '@/lib/security';
 
 export async function POST(request: Request) {
-    // Auth check for API usage (manual upload from UI might need proxy or key)
-    // For simplicity, UI proxy or direct key if available.
-    const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.APP_API_KEY}`) {
+    const apiKey = process.env.APP_API_KEY;
+    if (!apiKey) {
+        console.error('APP_API_KEY environment variable is not set');
+        return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    // Auth check for API usage using secure comparison to prevent timing attacks
+    const authHeader = request.headers.get('authorization') || '';
+    const expectedAuth = `Bearer ${apiKey}`;
+
+    if (!secureCompare(authHeader, expectedAuth)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
