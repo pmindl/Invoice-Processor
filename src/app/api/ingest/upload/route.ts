@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { uploadFile } from '@/lib/gdrive';
-import { getCompanyById, getCompanies } from '@/lib/companies';
-import { secureCompare } from '@/lib/security';
+import { getCompanyById } from '@/lib/companies';
+import { secureCompare, sanitizeFilename, validateFile } from '@/lib/security';
 
 export async function POST(request: Request) {
     const apiKey = process.env.APP_API_KEY;
@@ -27,6 +27,12 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'No file provided' }, { status: 400 });
         }
 
+        // Validate file
+        const validation = validateFile(file);
+        if (!validation.valid) {
+            return NextResponse.json({ error: validation.error }, { status: 400 });
+        }
+
         const company = getCompanyById(companyId);
         if (!company) {
             return NextResponse.json({ error: 'Invalid company' }, { status: 400 });
@@ -34,8 +40,11 @@ export async function POST(request: Request) {
 
         const buffer = Buffer.from(await file.arrayBuffer());
 
+        // Sanitize filename
+        const sanitizedFilename = sanitizeFilename(file.name);
+
         const fileId = await uploadFile(
-            file.name,
+            sanitizedFilename,
             file.type,
             buffer,
             company.gdriveFolderId
@@ -43,6 +52,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ success: true, fileId });
     } catch (error) {
-        return NextResponse.json({ error: (error as Error).message }, { status: 500 });
+        console.error('Upload error:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }
