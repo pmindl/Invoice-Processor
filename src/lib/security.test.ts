@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { secureCompare } from './security';
+import { secureCompare, sanitizeFilename, validateFile } from './security';
 
 describe('secureCompare', () => {
     it('returns true for identical strings', () => {
@@ -31,5 +31,44 @@ describe('secureCompare', () => {
         const token = 'secret-€-token';
         expect(secureCompare(token, token)).toBe(true);
         expect(secureCompare(token, 'secret-$-token')).toBe(false);
+    });
+});
+
+describe('sanitizeFilename', () => {
+    it('should allow valid filenames', () => {
+        expect(sanitizeFilename('invoice.pdf')).toBe('invoice.pdf');
+    });
+
+    it('should remove path traversal sequences', () => {
+        expect(sanitizeFilename('../secret.txt')).toBe('secret.txt');
+        expect(sanitizeFilename('/etc/passwd')).toBe('passwd');
+    });
+
+    it('should remove dangerous characters', () => {
+        expect(sanitizeFilename('file; rm -rf')).toBe('file__rm_-rf');
+    });
+
+    it('should handle empty filename', () => {
+        expect(sanitizeFilename('')).toBe('unnamed_file');
+    });
+});
+
+describe('validateFile', () => {
+    it('should validate valid file', () => {
+        const file = new File(['dummy content'], 'invoice.pdf', { type: 'application/pdf' });
+        expect(validateFile(file).valid).toBe(true);
+    });
+
+    it('should reject file exceeding size limit', () => {
+        const content = new Array(11 * 1024 * 1024).fill('a').join('');
+        const file = new File([content], 'large.pdf', { type: 'application/pdf' });
+        expect(validateFile(file).valid).toBe(false);
+        expect(validateFile(file).error).toContain('size exceeds');
+    });
+
+    it('should reject invalid file type', () => {
+        const file = new File(['dummy'], 'virus.exe', { type: 'application/x-msdownload' });
+        expect(validateFile(file).valid).toBe(false);
+        expect(validateFile(file).error).toContain('Invalid file type');
     });
 });
