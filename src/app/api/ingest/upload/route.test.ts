@@ -25,11 +25,12 @@ describe('Upload API', () => {
 
     it('should upload valid file', async () => {
         const formData = new FormData();
-        const file = new File(['dummy content'], 'invoice.pdf', { type: 'application/pdf' });
+        // Use valid PDF signature: %PDF-
+        const pdfContent = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2D]);
+        const file = new File([pdfContent], 'invoice.pdf', { type: 'application/pdf' });
 
-        // JSDOM File might not have arrayBuffer, let's patch it if needed or assume it works
         if (!file.arrayBuffer) {
-            file.arrayBuffer = async () => new ArrayBuffer(0);
+            file.arrayBuffer = async () => pdfContent.buffer;
         }
 
         formData.append('file', file);
@@ -87,9 +88,12 @@ describe('Upload API', () => {
         const { uploadFile } = await import('@/lib/gdrive');
 
         const formData = new FormData();
-        const file = new File(['content'], '../hack.pdf', { type: 'application/pdf' });
+        // Use valid PDF signature
+        const pdfContent = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2D]);
+        const file = new File([pdfContent], '../hack.pdf', { type: 'application/pdf' });
+
         if (!file.arrayBuffer) {
-            file.arrayBuffer = async () => new ArrayBuffer(0);
+            file.arrayBuffer = async () => pdfContent.buffer;
         }
         formData.append('file', file);
         formData.append('company', '1');
@@ -110,6 +114,30 @@ describe('Upload API', () => {
             expect.any(Buffer),
             'folder-123'
         );
+    });
+
+    it('should reject file with invalid content (magic bytes mismatch)', async () => {
+        const formData = new FormData();
+        const textContent = new TextEncoder().encode('this is just text, not a pdf');
+        const file = new File([textContent], 'fake.pdf', { type: 'application/pdf' });
+
+        if (!file.arrayBuffer) {
+            file.arrayBuffer = async () => textContent.buffer;
+        }
+
+        formData.append('file', file);
+        formData.append('company', '1');
+
+        const req = {
+            headers: new Headers({ 'Authorization': 'Bearer test-api-key' }),
+            formData: async () => formData
+        } as unknown as Request;
+
+        const res = await POST(req);
+        const data = await res.json();
+
+        expect(res.status).toBe(400);
+        expect(data.error).toContain('does not match');
     });
 
     it('should reject missing auth', async () => {

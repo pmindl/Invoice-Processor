@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { uploadFile } from '@/lib/gdrive';
 import { getCompanyById, getCompanies } from '@/lib/companies';
-import { secureCompare, validateFile, sanitizeFilename } from '@/lib/security';
+import { secureCompare, validateFile, validateFileContent, sanitizeFilename } from '@/lib/security';
 
 export async function POST(request: Request) {
     const apiKey = process.env.APP_API_KEY;
@@ -39,6 +39,12 @@ export async function POST(request: Request) {
         }
 
         const buffer = Buffer.from(await file.arrayBuffer());
+
+        // Validate file content (magic bytes)
+        const contentValidation = validateFileContent(buffer, file.type);
+        if (!contentValidation.valid) {
+            return NextResponse.json({ error: contentValidation.error }, { status: 400 });
+        }
 
         // Sanitize filename before uploading
         const safeFilename = sanitizeFilename(file.name);

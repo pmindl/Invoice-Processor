@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { secureCompare, sanitizeFilename, validateFile } from './security';
+import { secureCompare, sanitizeFilename, validateFile, validateFileContent } from './security';
 
 describe('secureCompare', () => {
     it('returns true for identical strings', () => {
@@ -70,5 +70,58 @@ describe('validateFile', () => {
         const file = new File(['dummy'], 'virus.exe', { type: 'application/x-msdownload' });
         expect(validateFile(file).valid).toBe(false);
         expect(validateFile(file).error).toContain('Invalid file type');
+    });
+});
+
+describe('validateFileContent', () => {
+    it('should validate valid PDF content', () => {
+        const buffer = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2D]); // %PDF-
+        expect(validateFileContent(buffer, 'application/pdf').valid).toBe(true);
+    });
+
+    it('should validate valid JPEG content', () => {
+        const buffer = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]);
+        expect(validateFileContent(buffer, 'image/jpeg').valid).toBe(true);
+    });
+
+    it('should validate valid PNG content', () => {
+        const buffer = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+        expect(validateFileContent(buffer, 'image/png').valid).toBe(true);
+    });
+
+    it('should validate valid WebP content', () => {
+        // RIFF + 4 bytes size + WEBP
+        const buffer = Buffer.from([
+            0x52, 0x49, 0x46, 0x46,
+            0x00, 0x00, 0x00, 0x00,
+            0x57, 0x45, 0x42, 0x50
+        ]);
+        expect(validateFileContent(buffer, 'image/webp').valid).toBe(true);
+    });
+
+    it('should reject invalid content for PDF', () => {
+        const buffer = Buffer.from('this is not a pdf');
+        expect(validateFileContent(buffer, 'application/pdf').valid).toBe(false);
+        expect(validateFileContent(buffer, 'application/pdf').error).toContain('does not match');
+    });
+
+    it('should reject mismatched content (JPEG as PDF)', () => {
+        const buffer = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0]);
+        expect(validateFileContent(buffer, 'application/pdf').valid).toBe(false);
+    });
+
+    it('should reject short buffer', () => {
+        const buffer = Buffer.from([0x25]);
+        expect(validateFileContent(buffer, 'application/pdf').valid).toBe(false);
+        expect(validateFileContent(buffer, 'application/pdf').error).toContain('too small');
+    });
+
+    it('should reject invalid WebP structure', () => {
+        const buffer = Buffer.from([
+            0x52, 0x49, 0x46, 0x46,
+            0x00, 0x00, 0x00, 0x00,
+            0x41, 0x42, 0x43, 0x44 // Not WEBP
+        ]);
+        expect(validateFileContent(buffer, 'image/webp').valid).toBe(false);
     });
 });
