@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { uploadFile } from '@/lib/gdrive';
 import { getCompanyById, getCompanies } from '@/lib/companies';
-import { secureCompare, validateFile, sanitizeFilename } from '@/lib/security';
+import { secureCompare, validateFile, sanitizeFilename, validateFileContent } from '@/lib/security';
 
 export async function POST(request: Request) {
     const apiKey = process.env.APP_API_KEY;
@@ -27,10 +27,16 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'No file provided' }, { status: 400 });
         }
 
-        // Validate file size and type
+        // Validate file size and type (metadata)
         const validation = validateFile(file);
         if (!validation.valid) {
             return NextResponse.json({ error: validation.error }, { status: 400 });
+        }
+
+        // Validate file content (magic bytes)
+        const contentValidation = await validateFileContent(file);
+        if (!contentValidation.valid) {
+             return NextResponse.json({ error: contentValidation.error }, { status: 400 });
         }
 
         const company = getCompanyById(companyId);

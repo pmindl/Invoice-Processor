@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { secureCompare, sanitizeFilename, validateFile } from './security';
+import { secureCompare, sanitizeFilename, validateFile, validateFileContent } from './security';
 
 describe('secureCompare', () => {
     it('returns true for identical strings', () => {
@@ -70,5 +70,54 @@ describe('validateFile', () => {
         const file = new File(['dummy'], 'virus.exe', { type: 'application/x-msdownload' });
         expect(validateFile(file).valid).toBe(false);
         expect(validateFile(file).error).toContain('Invalid file type');
+    });
+});
+
+describe('validateFileContent', () => {
+    it('should validate PDF file with correct magic bytes', async () => {
+        const content = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2D, 0x00]);
+        const file = new File([content], 'test.pdf', { type: 'application/pdf' });
+        const result = await validateFileContent(file);
+        expect(result.valid).toBe(true);
+    });
+
+    it('should validate JPEG file with correct magic bytes', async () => {
+        const content = new Uint8Array([0xFF, 0xD8, 0xFF, 0x00]);
+        const file = new File([content], 'test.jpg', { type: 'image/jpeg' });
+        const result = await validateFileContent(file);
+        expect(result.valid).toBe(true);
+    });
+
+    it('should validate PNG file with correct magic bytes', async () => {
+        const content = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+        const file = new File([content], 'test.png', { type: 'image/png' });
+        const result = await validateFileContent(file);
+        expect(result.valid).toBe(true);
+    });
+
+    it('should validate WebP file with correct magic bytes', async () => {
+        const content = new Uint8Array([
+            0x52, 0x49, 0x46, 0x46, // RIFF
+            0x00, 0x00, 0x00, 0x00, // Size (dummy)
+            0x57, 0x45, 0x42, 0x50  // WEBP
+        ]);
+        const file = new File([content], 'test.webp', { type: 'image/webp' });
+        const result = await validateFileContent(file);
+        expect(result.valid).toBe(true);
+    });
+
+    it('should reject file with invalid magic bytes (spoofed extension)', async () => {
+        // Text file content pretending to be PDF
+        const content = new TextEncoder().encode('This is not a PDF');
+        const file = new File([content], 'fake.pdf', { type: 'application/pdf' });
+        const result = await validateFileContent(file);
+        expect(result.valid).toBe(false);
+        expect(result.error).toContain('does not match');
+    });
+
+    it('should reject empty file', async () => {
+        const file = new File([], 'empty.pdf', { type: 'application/pdf' });
+        const result = await validateFileContent(file);
+        expect(result.valid).toBe(false);
     });
 });
