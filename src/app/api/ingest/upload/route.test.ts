@@ -25,11 +25,13 @@ describe('Upload API', () => {
 
     it('should upload valid file', async () => {
         const formData = new FormData();
-        const file = new File(['dummy content'], 'invoice.pdf', { type: 'application/pdf' });
+        // Valid PDF magic bytes (%PDF-)
+        const content = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2D]);
+        const file = new File([content], 'invoice.pdf', { type: 'application/pdf' });
 
         // JSDOM File might not have arrayBuffer, let's patch it if needed or assume it works
         if (!file.arrayBuffer) {
-            file.arrayBuffer = async () => new ArrayBuffer(0);
+            file.arrayBuffer = async () => content.buffer as ArrayBuffer;
         }
 
         formData.append('file', file);
@@ -87,9 +89,11 @@ describe('Upload API', () => {
         const { uploadFile } = await import('@/lib/gdrive');
 
         const formData = new FormData();
-        const file = new File(['content'], '../hack.pdf', { type: 'application/pdf' });
+        // Valid PDF magic bytes (%PDF-)
+        const content = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2D]);
+        const file = new File([content], '../hack.pdf', { type: 'application/pdf' });
         if (!file.arrayBuffer) {
-            file.arrayBuffer = async () => new ArrayBuffer(0);
+            file.arrayBuffer = async () => content.buffer as ArrayBuffer;
         }
         formData.append('file', file);
         formData.append('company', '1');
