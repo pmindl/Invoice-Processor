@@ -43,3 +43,7 @@ client_secret_*.json
 next-env.d.ts
 
 /src/generated/prisma
+
+# Security
+**/temp_key.txt
+**/*.key
