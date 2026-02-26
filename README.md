@@ -42,6 +42,9 @@ Automated invoice processing system using Google Gemini AI and SuperFaktura.
     SF_API_KEY="..."
     SF_COMPANY_ID="..."
     SF_BASE_URL="https://moje.superfaktura.cz"
+
+    # App Security
+    APP_API_KEY="your_secure_app_key"
     ```
 
 ## Usage Scripts
