@@ -1,70 +1,95 @@
+# Invoice Processor
 
-# Gmail Email Labeler
-
-A Python-based application that automatically analyzes and labels emails from the last 14 days using Gmail API and Gemini AI. It runs both on a schedule and on-demand via MCP server calls.
+Automated invoice processing system using Google Gemini AI and SuperFaktura.
 
 ## Features
+- **Auto-Ingestion**: Monitors Google Drive for new invoice PDFs.
+- **AI Parsing**: Uses Gemini 2.0 Flash to extract data (Supplier, ICO, Variable Symbol, Dates, Line Items).
+- **Duplicate Protection**: Robust protection against double-exports using n8n-style logic (Base64 encoded search + custom date filters).
+- **SuperFaktura Integration**: Automatically creates expenses/bills in SuperFaktura.
+- **Database**: Stores all processed invoices in a local SQLite database (via Prisma).
 
-- **Automated Labeling**: Classifies threads into STATUS, TYPE, FINANCE, ACTION, and PRIORITY categories.
-- **Dual Mode**: 
-    - **Scheduler**: Runs periodically (every 10 minutes) to keep inbox organized.
-    - **MCP Tool**: Can be triggered by LLM agents to scan specific threads or perform ad-hoc runs.
-- **Smart Logic**:
-    - Updates labels based on new messages.
-    - Respects manual overrides (doesn't overwrite "Closed" status if valid).
-    - Idempotent label creation.
-    - "Waiting for reply" detection.
+## Setup
 
-## Architecture
+1.  **Clone & Install**
+    ```bash
+    npm install
+    ```
 
-- **Core**: Python 3.11+
-- **MCP Interface**: Node.js wrapper (`src/mcp-server.ts`) using `@modelcontextprotocol/sdk`.
-- **Secrets**: Integrated with Alpha Vault (`run-with-secrets.js`) using shared `GOOGLE_*` credentials.
+2.  **Database Setup**
+    ```bash
+    npx prisma generate
+    npx prisma db push
+    ```
 
-## Configuration
+3.  **Environment Variables**
+    Create a `.env` file with the following:
+    ```env
+    # Database
+    DATABASE_URL="file:./dev.db"
 
-The app requires the following environment variables (automatically injected in Vault Mode):
+    # Gemini AI
+    GEMINI_API_KEY="your_gemini_key"
 
-- `GOOGLE_CLIENT_ID`
-- `GOOGLE_CLIENT_SECRET`
-- `GOOGLE_REFRESH_TOKEN`
-- `GEMINI_API_KEY`
-- `DAYS_LOOKBACK` (Optional, default 14)
+    # Google Drive Auth
+    GOOGLE_CLIENT_ID="..."
+    GOOGLE_CLIENT_SECRET="..."
+    GOOGLE_REDIRECT_URI="http://localhost:5678/oauth2callback"
+    GOOGLE_REFRESH_TOKEN="..." # Generated via scripts/auth-server.ts
 
-## Installation & Usage
+    # SuperFaktura
+    SF_API_EMAIL="..."
+    SF_API_KEY="..."
+    SF_COMPANY_ID="..."
+    SF_BASE_URL="https://moje.superfaktura.cz"
+    ```
 
-### 1. Install Dependencies
+## Usage Scripts
+
+### 1. Manual File Processing
+Process a specific local PDF file to test the whole pipeline.
 ```bash
-# In apps/gmail-labeler/
-pip install -r requirements.txt
-npm install
+npx tsx scripts/test-processing.ts <path/to/invoice.pdf>
 ```
 
-### 2. Run Locally (Vault Mode)
+### 2. End-to-End Batch Test
+Process the oldest pending invoice from the database and try to export it.
 ```bash
-# From root
-npm run dev --workspace=apps/gmail-labeler
-# Or
-npm run mcp --workspace=apps/gmail-labeler
+npx tsx scripts/test-export.ts
 ```
 
-### 3. Run Standalone (Dev Mode)
-Create a `.env.local` file in `apps/gmail-labeler/` with the required credentials.
-```bash
-python main.py --mode manual
-# Or 
-python main.py --mode scheduler
-```
+### 3. Google Drive Integration Tests
+1. Run the test script (simulates the entire flow):
+   ```bash
+   npx tsx scripts/test-e2e.ts
+   ```
 
-### 4. CLI Options
-```bash
-python main.py --help
-# usage: main.py [-h] [--mode {scheduler,mcp,manual,taxonomy}] [--days DAYS] [--limit LIMIT] [--force]
-```
+2. Run Batch Test (Processes all files in GDrive):
+   ```bash
+   npx tsx scripts/run-batch-test.ts
+   ```
 
 ## Logging
+The system maintains a detailed `ProcessingLog` in the database for every action.
+- **Levels**: INFO, WARN, ERROR
+- **Sources**: API, BatchProcessor, Gemini, SuperFaktura
+- **Content**: Timestamp, Message, JSON Details
 
-Logs are stored in `logs/runs/{DATE}/{UUID}.[json|txt]`.
+You can audit these logs to trace exactly what happened to any invoice file.
 
-- **JSON**: Machine-readable full execution report.
-- **TXT**: Human-readable summary of actions taken.
+### 4. Auth Token Generation
+If you need to generate a new Google Refresh Token:
+```bash
+npx tsx scripts/auth-server.ts
+# Open the printed URL in your browser
+```
+
+## Duplicate Detection Logic
+The system uses a specific logic to prevent duplicates in SuperFaktura:
+1.  **Encoding**: The Variable Symbol is Base64 encoded with special character replacements (`+`->`-`, `/`->`_`, `=`->`,`).
+2.  **Search**: Queries `/expenses/index.json` with `created:3` and a date range of 2020-2030 to find existing invoices regardless of creation date.
+3.  **Prevention**: If a match is found, the export is skipped.
+
+## Deployment
+1.  Build the project: `npm run build`
+2.  Start the server: `npm start`
