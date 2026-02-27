@@ -5,49 +5,49 @@ import { useState } from 'react';
 export function UploadZone({ onUploadComplete }: { onUploadComplete: () => void }) {
     const [uploading, setUploading] = useState(false);
     const [message, setMessage] = useState('');
-
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        // Default to first company or ask user. 
-        // For MVP, simplify: upload to configurable default or Company A?
-        // Let's assume we want to select company.
-        // UI needs Select. For now hardcode 'firma_a' or add select.
-        // Let's add a simple select.
-
-        // Changing approach: Don't auto-upload on change. Show selected file and "Upload" button.
-    };
+    const [apiKey, setApiKey] = useState('');
 
     const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         setUploading(true);
         setMessage('');
 
-        const formData = new FormData(e.currentTarget);
+        if (!apiKey) {
+            setMessage('Error: API Key is required');
+            setUploading(false);
+            return;
+        }
 
-        // Add API Key for auth? 
-        // Secure way: Proxy route.
-        // Let's implement /api/trigger/upload proxy? No, too complex.
-        // Let's just use the proxy approach again or rely on basic unprotected route for local tool?
-        // Let's use a proxy route /api/upload-proxy
+        const formData = new FormData(e.currentTarget);
+        // Remove apiKey from formData if it was included by the form (it isn't currently an input inside form, but good practice)
 
         try {
-            const res = await fetch('/api/upload-proxy', {
+            // Direct call to the secure endpoint with client-provided key
+            const res = await fetch('/api/ingest/upload', {
                 method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`
+                },
                 body: formData
             });
 
             const data = await res.json();
-            if (data.success) {
+
+            if (res.status === 401) {
+                setMessage('Error: Invalid API Key');
+            } else if (data.success) {
                 setMessage('Upload successful!');
                 onUploadComplete();
-                (e.target as HTMLFormElement).reset();
+                // Reset file input but keep API key for convenience? Or clear both?
+                // Let's clear file input only.
+                const form = e.target as HTMLFormElement;
+                const fileInput = form.querySelector('input[type="file"]') as HTMLInputElement;
+                if (fileInput) fileInput.value = '';
             } else {
-                setMessage('Error: ' + data.error);
+                setMessage('Error: ' + (data.error || 'Unknown error'));
             }
         } catch (err) {
-            setMessage('Upload failed');
+            setMessage('Upload failed: ' + (err as Error).message);
         } finally {
             setUploading(false);
         }
@@ -56,7 +56,16 @@ export function UploadZone({ onUploadComplete }: { onUploadComplete: () => void 
     return (
         <div className="card" style={{ marginTop: '2rem' }}>
             <h3 style={{ marginBottom: '1rem' }}>Manual Upload</h3>
-            <form onSubmit={handleUpload} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <form onSubmit={handleUpload} style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                    type="password"
+                    placeholder="Enter App API Key"
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    className="btn"
+                    style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)' }}
+                    required
+                />
                 <input type="file" name="file" required className="btn" />
                 <select name="company" className="btn" style={{ background: 'var(--bg-surface)' }}>
                     <option value="firma_a">Lumegro (Firma A)</option>
