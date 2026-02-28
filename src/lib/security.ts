@@ -7,7 +7,9 @@ import { timingSafeEqual } from 'crypto';
  * @param b - The second string to compare (e.g., expected token)
  * @returns true if strings are identical, false otherwise
  */
-export function secureCompare(a: string, b: string): boolean {
+export function secureCompare(a: string | null | undefined, b: string | null | undefined): boolean {
+    if (a == null || b == null) return false;
+
     const bufferA = Buffer.from(a);
     const bufferB = Buffer.from(b);
 
