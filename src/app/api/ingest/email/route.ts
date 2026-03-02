@@ -1,15 +1,25 @@
 import { NextResponse } from 'next/server';
 import { checkEmails } from '@/lib/gmail';
+import { secureCompare } from '@/lib/security';
 
 export const dynamic = 'force-dynamic'; // Ensure this route is never cached
 
 export async function GET(request: Request) {
-    // Simple API key check for cron usage
-    const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.APP_API_KEY}`) {
+    const apiKey = process.env.APP_API_KEY;
+    if (!apiKey) {
+        console.error('APP_API_KEY environment variable is not set');
+        return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    // Simple API key check for cron usage using secure comparison
+    const authHeader = request.headers.get('authorization') || '';
+    const expectedAuth = `Bearer ${apiKey}`;
+
+    if (!secureCompare(authHeader, expectedAuth)) {
         // Also check query param for easier manual testing
         const { searchParams } = new URL(request.url);
-        if (searchParams.get('key') !== process.env.APP_API_KEY) {
+        const queryKey = searchParams.get('key') || '';
+        if (!secureCompare(queryKey, apiKey)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
     }
