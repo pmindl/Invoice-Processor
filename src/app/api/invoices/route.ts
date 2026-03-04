@@ -1,7 +1,21 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { secureCompare } from '@/lib/security';
 
 export async function GET(request: Request) {
+    const apiKey = process.env.APP_API_KEY;
+    if (!apiKey) {
+        console.error('APP_API_KEY environment variable is not set');
+        return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    const authHeader = request.headers.get('authorization') || '';
+    const expectedAuth = `Bearer ${apiKey}`;
+
+    if (!secureCompare(authHeader, expectedAuth)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const { searchParams } = new URL(request.url);
         const status = searchParams.get('status');
@@ -24,6 +38,19 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+    const apiKey = process.env.APP_API_KEY;
+    if (!apiKey) {
+        console.error('APP_API_KEY environment variable is not set');
+        return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    const authHeader = request.headers.get('authorization') || '';
+    const expectedAuth = `Bearer ${apiKey}`;
+
+    if (!secureCompare(authHeader, expectedAuth)) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
     try {
         const body = await request.json();
         const { id, status } = body;
