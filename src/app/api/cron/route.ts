@@ -1,10 +1,20 @@
 import { NextResponse } from 'next/server';
+import { secureCompare } from '@/lib/security';
 
 export async function GET(request: Request) {
-    const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.APP_API_KEY}`) {
+    const apiKey = process.env.APP_API_KEY;
+    if (!apiKey) {
+        console.error('APP_API_KEY environment variable is not set');
+        return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+    }
+
+    const authHeader = request.headers.get('authorization') || '';
+    const expectedAuth = `Bearer ${apiKey}`;
+
+    if (!secureCompare(authHeader, expectedAuth)) {
         const { searchParams } = new URL(request.url);
-        if (searchParams.get('key') !== process.env.APP_API_KEY) {
+        const queryKey = searchParams.get('key') || '';
+        if (!secureCompare(queryKey, apiKey)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
     }
