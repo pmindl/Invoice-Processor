@@ -22,6 +22,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({ success: true });
     } catch (err) {
-        return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+        console.error('Trigger API error:', err);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

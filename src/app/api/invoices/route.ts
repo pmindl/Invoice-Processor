@@ -33,7 +33,8 @@ export async function GET(request: Request) {
 
         return NextResponse.json(invoices);
     } catch (error) {
-        return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 });
+        console.error('Invoices GET API error:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
 
@@ -66,6 +67,7 @@ export async function PATCH(request: Request) {
 
         return NextResponse.json(updated);
     } catch (error) {
-        return NextResponse.json({ error: 'Failed to update invoice' }, { status: 500 });
+        console.error('Invoices PATCH API error:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

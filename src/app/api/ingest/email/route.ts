@@ -29,6 +29,6 @@ export async function GET(request: Request) {
         return NextResponse.json({ success: true, processed: results.length, details: results });
     } catch (error) {
         console.error('Email ingestion error:', error);
-        return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
+        return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
     }
 }
