@@ -2,12 +2,20 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getCompanies } from '@/lib/companies';
 import { createExpense, checkDuplicate } from '@/lib/superfaktura';
+import { secureCompare } from '@/lib/security';
 
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
+    if (!process.env.APP_API_KEY) {
+        console.error('CRITICAL: APP_API_KEY is not set in environment.');
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.APP_API_KEY}`) {
+    const providedToken = authHeader?.replace('Bearer ', '');
+
+    if (!secureCompare(providedToken, process.env.APP_API_KEY)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

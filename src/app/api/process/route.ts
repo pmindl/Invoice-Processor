@@ -6,6 +6,7 @@ import { parseInvoice } from '@/lib/gemini';
 import { parsePacketaInvoice } from '@/lib/parsers/packeta';
 import { CompanyConfig, ParsedInvoice } from '@/lib/types';
 import { logEvent } from '@/lib/logger';
+import { secureCompare } from '@/lib/security';
 
 export const maxDuration = 60; // Allow 60s for processing
 
@@ -158,8 +159,13 @@ export async function processCompany(company: CompanyConfig) {
 export async function POST(request: Request) {
     try {
         // Check auth
+        if (!process.env.APP_API_KEY) {
+            console.error('CRITICAL: APP_API_KEY is not set in environment.');
+            return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        }
+
         const apiKey = request.headers.get('x-api-key');
-        if (apiKey !== process.env.APP_API_KEY) {
+        if (!secureCompare(apiKey, process.env.APP_API_KEY)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
