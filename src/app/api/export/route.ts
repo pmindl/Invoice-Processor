@@ -2,12 +2,18 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getCompanies } from '@/lib/companies';
 import { createExpense, checkDuplicate } from '@/lib/superfaktura';
+import { secureCompare } from '@/lib/security';
 
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
+    if (!process.env.APP_API_KEY) {
+        console.error('CRITICAL: APP_API_KEY is not defined in the environment.');
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+
     const authHeader = request.headers.get('authorization');
-    if (authHeader !== `Bearer ${process.env.APP_API_KEY}`) {
+    if (!authHeader || !secureCompare(authHeader, `Bearer ${process.env.APP_API_KEY}`)) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -75,6 +81,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: true, results });
 
     } catch (error) {
-        return NextResponse.json({ success: false, error: (error as Error).message }, { status: 500 });
+        console.error('Export API error:', error);
+        return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
     }
 }
