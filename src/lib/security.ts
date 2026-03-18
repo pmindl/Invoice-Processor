@@ -15,3 +15,21 @@ export function secureCompare(a: string, b: string): boolean {
 
     return crypto.timingSafeEqual(aHash, bHash);
 }
+
+
+export function isAuthenticated(request: Request): boolean {
+    const apiKey = process.env.APP_API_KEY;
+    if (!apiKey) {
+        console.error('CRITICAL: APP_API_KEY is not defined in the environment.');
+        return false;
+    }
+
+    const authHeader = request.headers.get('authorization');
+    const apiKeyHeader = request.headers.get('x-api-key');
+    const url = new URL(request.url);
+    const queryKey = url.searchParams.get('key');
+
+    return (authHeader && secureCompare(authHeader, `Bearer ${apiKey}`)) ||
+           (apiKeyHeader && secureCompare(apiKeyHeader, apiKey)) ||
+           (queryKey && secureCompare(queryKey, apiKey)) || false;
+}
